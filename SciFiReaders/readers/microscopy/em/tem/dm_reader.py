@@ -126,13 +126,21 @@ def read_string(dm_file, length=1):
 
 class DMReader(sidpy.Reader):
     """
-    file_path: filepath to dm3 or dm4 file.
+    Reader of Digital Micrograph image and spectroscopy data
 
-    warn('This Reader will eventually be moved to the ScopeReaders package'
-         '. Be prepared to change your import statements',
-         FutureWarning)
+    This reader reads (attribute read) all the different data in the file and returns it as a dictionary 
+    of sidpy.Datasets
+
+    Parameter:
+    ---------
+    file_path: str
+        filepath to dm3 or dm4 file.
+
+    Return:
+    ------
+    datasets: dict
+        dictionary of sidpy datasets
     """
-
     def __init__(self, file_path, verbose=False):
         super().__init__(file_path)
 
@@ -186,6 +194,7 @@ class DMReader(sidpy.Reader):
             print("| parse DM3 file: %.3g s" % (t2 - t1))
         if '1' in self.__stored_tags['ImageList']:
             start=1
+        channel_number = 0
         for image_number in self.__stored_tags['ImageList'].keys():
             if int(image_number) >= start:
                 dataset = self.get_dataset(self.__stored_tags['ImageList'][image_number])
@@ -214,16 +223,19 @@ class DMReader(sidpy.Reader):
                     dataset.source = 'SciFiReaders.DMReader'
                     dataset.original_metadata['DM']['full_file_name'] = self.__filename
                     
-                    key = f'Channel_{int(image_number):03d}'
+                    key = f"Channel_{int(channel_number):03d}"
+                    channel_number += 1
                     self.datasets[key] = dataset
                     self.extract_crucial_metadata(key)
 
         del self.__stored_tags['ImageList'] 
-        main_dataset_number = 0
-        for index, dataset in self.datasets.items():
-            if 'urvey' in dataset.title:
-                main_dataset_number = index
         main_dataset_key = list(self.datasets.keys())[0]
+
+        for key, dataset in self.datasets.items():
+            if 'urvey' in dataset.title:
+                main_dataset_key = key
+        if self.verbose:
+            print(main_dataset_key)
         self.datasets[main_dataset_key].original_metadata.update(self.__stored_tags)
         self.close()
         return self.datasets
