@@ -9,6 +9,9 @@ import io
 from struct import *
 import xml.etree.ElementTree as ET
 
+
+#Decarator has been copied from the https://github.com/symartin/PyMDT
+
 class MDTBufferedReaderDecorator(object):
     """
         A decorator class that facilitate the sequential reading of a file.
@@ -109,7 +112,8 @@ class MDTReader(Reader):
             print(f'File size: {self._file_size}')
             print(f'Number of frames: {self.nb_frame}')
             print()
-        dataset_list = []
+        dataset_dict = {}
+        #channel_number = 0
         #iterator for the frames inside the file
         for i in range(self.nb_frame):
             self._frame = Frame(decorator = self._file)
@@ -126,7 +130,9 @@ class MDTReader(Reader):
                 self._frame._read_text()#TODO
 
 
-            dataset_list.append(self._frame.data)
+            #dataset_list.append(self._frame.data)
+            key_channel = f"Channel_{i:03d}"
+            dataset_dict[key_channel] = self._frame.data
 
             #might be rewrite to create dict() initially - without list()
             dataset_dict = {}
@@ -175,7 +181,6 @@ class MDTReader(Reader):
 
         #  19 bytes reserved (??)
         self._file.shift_position(19)
-
 
 class Frame:
     '''
@@ -752,10 +757,6 @@ class Frame:
 
 
 
-
-
-
-#
 
 
 

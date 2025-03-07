@@ -11,7 +11,7 @@ with open(os.path.join(here, 'SciFiReaders/__version__.py')) as f:
 
 # TODO: Move requirements to requirements.txt
 requirements = [  # basic
-                'setuptools==58.2.0',
+                'setuptools',
                 'numpy',
                 'toolz',  # dask installation failing without this
                 'cytoolz',  # dask installation failing without this
@@ -22,6 +22,7 @@ requirements = [  # basic
                 'ipython>=7.1.0',
                 'pyUSID',
                 'gdown',
+                'mrcfile',
                 # generic:
                 # Reader specific ones go to extras
                ]
@@ -40,10 +41,10 @@ setuptools.setup(
         'Natural Language :: English',
         'Operating System :: OS Independent',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
         'Programming Language :: Python :: Implementation :: CPython',
         'Topic :: Scientific/Engineering :: Information Analysis'],
     keywords=['imaging', 'spectra', 'multidimensional', 'scientific'],

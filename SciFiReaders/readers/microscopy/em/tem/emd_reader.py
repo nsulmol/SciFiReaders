@@ -53,7 +53,7 @@ class EMDReader(sidpy.Reader):
         dictionary of sidpy.Datasets
     """
     def __init__(self, file_path, sum_frames=False, no_eds=False):
-        super(EMDReader, self).__init__(file_path)
+        super().__init__(file_path)
 
         # Let h5py raise an OS error if a non-HDF5 file was provided
         self._h5_file = h5py.File(file_path, mode='r+')
@@ -66,7 +66,6 @@ class EMDReader(sidpy.Reader):
         self.label_dict = {}
         self.no_eds = no_eds
         self.sum_frames = sum_frames
-            
         self.number_of_frames = 1
 
 
@@ -85,7 +84,7 @@ class EMDReader(sidpy.Reader):
         else:
             return False
 
-    def read(self, eds_stream=False):
+    def read(self, eds_stream=False, bin=2):
         """
         Reads all available datasets in FEI Velox style hdf5 files with .edm
 
@@ -93,6 +92,8 @@ class EMDReader(sidpy.Reader):
         ----------
         eds_stream: boolean
             switch to return spectrum image (default - False) or original spectrum stream (True)
+        bin: int
+            binning factor for EDS spectrum size reduction
 
         Returns
         -------
@@ -104,6 +105,8 @@ class EMDReader(sidpy.Reader):
             raise TypeError('Velox EMD File is empty')
     
         number_of_datasets = 0
+
+        self.bin = bin
         use_tqdm = False
         for key in self._h5_file['Data']:
             if key == 'SpectrumStream':
@@ -164,7 +167,7 @@ class EMDReader(sidpy.Reader):
                 data_array = np.squeeze(data_array)
                 chunks = 1
             else:
-                chunks= [32, 32, data_array.shape[2]]
+                chunks= [data_array.shape[1], 32, data_array.shape[2]]
                 if data_array.shape[0]> chunks[0]:
                     chunks[0] = data_array.shape[0]
                 if data_array.shape[1]> chunks[1]:
@@ -183,9 +186,9 @@ class EMDReader(sidpy.Reader):
             for detector in detectors.values():
                 if self.metadata['BinaryResult']['Detector'] in detector['DetectorName']:
                     if 'OffsetEnergy' in detector:
-                        offset = float(detector['OffsetEnergy'])
+                        offset = float(detector['OffsetEnergy'])/self.bin
                     if 'Dispersion' in detector:
-                        dispersion = float(detector['Dispersion'])
+                        dispersion = float(detector['Dispersion'])/self.bin
 
             self.datasets[key].units = 'counts'
             self.datasets[key].quantity = 'intensity'
@@ -231,20 +234,21 @@ class EMDReader(sidpy.Reader):
                 size_x = int(float(scan['ScanSize']['width']) * float(scan['ScanArea']['right'])-float(scan['ScanSize']['width']) * float(scan['ScanArea']['left']))
                 size_y = int(float(scan['ScanSize']['height']) * float(scan['ScanArea']['bottom'])-float(scan['ScanSize']['height']) * float(scan['ScanArea']['top']))
             
-        if 'RasterScanDefinition' in acquisition:
+        elif 'RasterScanDefinition' in acquisition:
             size_x = int(acquisition['RasterScanDefinition']['Width'])
             size_y = int(acquisition['RasterScanDefinition']['Height'])
         spectrum_size = int(acquisition['bincount'])
 
         self.number_of_frames = int(np.ceil((self.data_array[:, 0] == 65535).sum() / (size_x * size_y)))
         # print(size_x,size_y,number_of_frames)
-        data_array = np.zeros((size_x * size_y, spectrum_size),dtype=np.ushort)
+        
+        data_array = np.zeros((size_x * size_y, int(spectrum_size/self.bin)),dtype=np.ushort)
         # progress = tqdm(total=number_of_frames)
         
-        data, frame = get_stream(data_array, size_x*size_y, self.data_array[:, 0])
+        data, frame = get_stream(data_array, size_x*size_y, self.data_array[:, 0], self.bin)
         
         self.number_of_frames = frame
-        return np.reshape(data, (size_x, size_y, spectrum_size))
+        return np.reshape(data, (size_x, size_y, int(spectrum_size/self.bin)))
 
     def get_image(self):
         key = f"Channel_{int(self.channel_number):03d}"
@@ -321,25 +325,62 @@ class EMDReader(sidpy.Reader):
 
     def extract_crucial_metadata(self, key):
         metadata = self.datasets[key].original_metadata
+       
         experiment = {'detector': metadata['BinaryResult']['Detector'],
                       'acceleration_voltage': float(metadata['Optics']['AccelerationVoltage']),
                       'microscope': metadata['Instrument']['InstrumentClass'],
-                      'start_date_time': int(metadata['Acquisition']['AcquisitionStartDatetime']['DateTime'])}
-
+                      'start_date_time': int(metadata['Acquisition']['AcquisitionStartDatetime']['DateTime']),
+                      'collection_angle': 0.0,
+                      'convergence_angle': 0.0}
         if metadata['Optics']['ProbeMode'] == "1":
             experiment['probe_mode'] = "convergent"
             if 'BeamConvergence' in metadata['Optics']:
                 experiment['convergence_angle'] = float(metadata['Optics']['BeamConvergence'])
         else:  # metadata['Optics']['ProbeMode'] == "2":
             experiment['probe_mode'] = "parallel"
-            experiment['convergence_angle'] = 0.0
-        experiment['stage'] = {"holder": "",
-                               "position": {"x": float(metadata['Stage']['Position']['x']),
-                                            "y": float(metadata['Stage']['Position']['y']),
-                                            "z": float(metadata['Stage']['Position']['z'])},
-                               "tilt": {"alpha": float(metadata['Stage']['AlphaTilt']),
-                                        "beta": float(metadata['Stage']['BetaTilt'])}}
-
+        if 'Stage' in metadata:
+            if 'BetaTilt' not in metadata['Stage']:
+                metadata['Stage']['BetaTilt'] = 0.0
+                experiment['stage'] = {"holder": "",
+                                       "position": {"x": float(metadata['Stage']['Position']['x']),
+                                                    "y": float(metadata['Stage']['Position']['y']),
+                                                    "z": float(metadata['Stage']['Position']['z'])},
+                                       "tilt": {"alpha": float(metadata['Stage']['AlphaTilt']),
+                                                "beta": float(metadata['Stage']['BetaTilt'])}}
+        if 'Instrument'in metadata:
+            if 'InstrumentModel' in metadata['Instrument']:
+                model = metadata['Instrument']['InstrumentModel']
+            else:
+                model = ''
+            if 'InstrumentId' in metadata['Instrument']:
+                id = metadata['Instrument']['InstrumentId']
+            else:
+                id = 0
+            experiment['instrument'] = model + str(id)
+        if 'Optics' in metadata:
+            if 'LastMeasuredScreenCurrent' in metadata['Optics']:
+                experiment['current'] = float(metadata['Optics']['LastMeasuredScreenCurrent'])
+        if 'Scan' in metadata:
+            if 'DwellTime' in metadata['Scan']:
+                experiment['pixel_time'] = float(metadata['Scan']['DwellTime'])
+            if 'FrameTime' in metadata['Scan']:
+                experiment['exposure_time'] = float(metadata['Scan']['FrameTime'])
+        if 'Sample' in metadata:
+            if 'SampleDescription' in metadata['Sample']:
+                experiment['sample'] = metadata['Sample']['SampleDescription']
+            if 'SampleId' in metadata['Sample']:
+                experiment['sample_id'] = metadata['Sample']['SampleId']
+        if 'Detectors' in metadata:
+            used_detector = experiment['detector']
+            for detector in metadata['Detectors'].values():
+                if 'DetectorName' in detector:
+                    if used_detector in detector['DetectorName']:
+                        if 'CollectionAngleRange' in detector:
+                            begin = detector['CollectionAngleRange']['begin']
+                            end = detector['CollectionAngleRange']['end']
+                            experiment['collection_angle'] = float(begin)
+                            experiment['collection_angle_end'] = float(end)
+        
         self.datasets[key].metadata['experiment'] = experiment
         if self.datasets[key].title == 'generic':
             self.datasets[key].title = experiment['detector']
@@ -348,7 +389,7 @@ class EMDReader(sidpy.Reader):
         self._h5_file.close()
 
 @njit(cache=True)
-def get_stream(data, size, data_stream):
+def get_stream(data, size, data_stream, bin):
     #for value in self.data_array[:, 0]:
     #from tqdm.auto import trange, tqdm
     pixel_number = 0
@@ -359,8 +400,6 @@ def get_stream(data, size, data_stream):
             if pixel_number >= size:
                 pixel_number = 0
                 frame += 1
-                # print(frame)
-                # progress.update(1)
         else:
-            data[pixel_number, value] += 1
+            data[pixel_number, int(value/bin-0.2)] += 1
     return data, frame
