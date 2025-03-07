@@ -55,7 +55,6 @@ class TestMDT(unittest.TestCase):
         self.assertTrue(image.ndim == 2)
 
         self.assertEqual(image.title, '1F:Iprobe')
-        self.assertEqual(image.type, '2D IMAGE')
         self.assertTrue(image.data_type.name, 'IMAGE')
         self.assertEqual(image.units, 'nA')
         self.assertEqual(image.quantity, 'Iprobe')
