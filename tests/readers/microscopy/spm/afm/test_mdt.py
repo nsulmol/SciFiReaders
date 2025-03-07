@@ -17,17 +17,13 @@ import unittest
 sys.path.append("../../../../../SciFiReaders/")
 import SciFiReaders
 
-root_path = os.path.join('https://github.com',
-                         'Slautin',
-                         'test',
-                         'blob',
-                         '9e4731fc0d821b2509aba33fb76fefe7d6d2dcd5')
+root_path = "https://github.com/pycroscopy/SciFiDatasets/blob/main/data/microscopy/spm/afm/"
 
 
 class TestMDT(unittest.TestCase):
 
     def test_mdt_file(self):
-        file_path = os.path.join(root_path, 'example2.mdt?raw=true')
+        file_path = os.path.join(root_path, 'test_mdt.mdt?raw=true')
         file_name = wget.download(file_path)
 
         reader = SciFiReaders.MDTReader(file_name)
@@ -40,7 +36,7 @@ class TestMDT(unittest.TestCase):
         self.assertEqual(len(datasets), 3)
 
     def test_data_available(self):
-        file_path = os.path.join(root_path, 'example2.mdt?raw=true')
+        file_path = os.path.join(root_path, 'test_mdt.mdt?raw=true')
         file_name = wget.download(file_path)
 
         reader = SciFiReaders.MDTReader(file_name)
@@ -48,7 +44,7 @@ class TestMDT(unittest.TestCase):
         self.assertIsInstance(reader, sidpy.Reader)
 
     def test_read_image(self):
-        file_path = os.path.join(root_path, 'example2.mdt?raw=true')
+        file_path = os.path.join(root_path, 'test_mdt.mdt?raw=true')
         file_name = wget.download(file_path)
 
         reader = SciFiReaders.MDTReader(file_name)
@@ -81,7 +77,7 @@ class TestMDT(unittest.TestCase):
         self.assertEqual(image.y.units, 'um')
 
     def test_read_point_cloud(self):
-        file_path = os.path.join(root_path, 'example2.mdt?raw=true')
+        file_path = os.path.join(root_path, 'test_mdt.mdt?raw=true')
         file_name = wget.download(file_path)
 
         reader = SciFiReaders.MDTReader(file_name)
