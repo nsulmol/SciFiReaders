@@ -135,16 +135,16 @@ class MDTReader(Reader):
             dataset_dict[key_channel] = self._frame.data
 
             #might be rewrite to create dict() initially - without list()
-            dataset_dict = {}
-            for index, dataset in enumerate(dataset_list):
-                if type(dataset) == sidpy.Dataset:
-                    title = dataset.title
-                elif type(dataset) == dict:
-                    title = 'Spectral_data'
-                else:
-                    title = 'Unknown'
-
-                dataset_dict[f'{index:03}_{title}'] = dataset
+            # dataset_dict = {}
+            # for index, dataset in enumerate(dataset_list):
+            #     if type(dataset) == sidpy.Dataset:
+            #         title = dataset.title
+            #     elif type(dataset) == dict:
+            #         title = 'Spectral_data'
+            #     else:
+            #         title = 'Unknown'
+            #
+            #     dataset_dict[f'{index:03}_{title}'] = dataset
 
             if verbose:
                 print(f'Frame #{i}: type - {self._frame.type}',

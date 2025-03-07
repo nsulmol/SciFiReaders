@@ -32,7 +32,7 @@ class TestMDT(unittest.TestCase):
         self.assertEqual(reader._file_size, 2041471)
         self.assertEqual(reader.nb_frame, 3)
 
-        self.assertEqual(type(datasets), list)
+        self.assertEqual(type(datasets), dict)
         self.assertEqual(len(datasets), 3)
 
     def test_data_available(self):
@@ -49,7 +49,7 @@ class TestMDT(unittest.TestCase):
 
         reader = SciFiReaders.MDTReader(file_name)
         datasets = reader.read()
-        image = datasets[1]
+        image = datasets['Channel_001']
 
         self.assertIsInstance(image, sidpy.Dataset)
         self.assertTrue(image.ndim == 2)
@@ -82,7 +82,7 @@ class TestMDT(unittest.TestCase):
 
         reader = SciFiReaders.MDTReader(file_name)
         datasets = reader.read()
-        point_cloud = datasets[2]
+        point_cloud = datasets['Channel_002']
 
         self.assertIsInstance(point_cloud, sidpy.Dataset)
         self.assertTrue(point_cloud.ndim == 3)
