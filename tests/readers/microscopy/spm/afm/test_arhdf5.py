@@ -3,17 +3,14 @@ import sidpy
 import SciFiReaders as sr
 from pywget import wget
 import os
-import gdown
-try:
-    import gdown
-except ImportError:
-    import pip
-    pip.main(['install', 'gdown'])
+
+#TODO: Change this file to be a simpel 2x2 force curve file acquired on one of teh Veros, and put it in SciFiDatasets repo.
+#This file is way too large at the moment
 
 @pytest.fixture
 def arhdf5_file():
     file_path = 'PTO_SS_00.h5'
-    gdown.download('https://drive.google.com/uc?id=10LpXdpm2tPiGEE_rqKlrIkZhaYkP_YBs', file_path, quiet=False)
+    wget.download('https://www.dropbox.com/scl/fi/r4dcstilxsdg8un2nl7g0/PTO_SS_00.h5?rlkey=y4gmc0zq1vpvm8hzrigk5quy3&dl=1', out=file_path)
     yield file_path
     os.remove(file_path)
 
