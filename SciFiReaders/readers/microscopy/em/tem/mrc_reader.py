@@ -4,6 +4,11 @@
 #
 # Written by Austin Houston, UTK 2024
 #
+# based on MRC2014 file format:
+# https://www.ccpem.ac.uk/mrc_format/mrc2014.php
+#
+# and corresponding mrcfile package:
+# https://pypi.org/project/mrcfile/
 ################################################################################
 
 
@@ -23,7 +28,7 @@ except ImportError:
 
 __all__ = ["MRCReader", "version"]
 
-version = '0.1'
+version = '1.0'
 
 
 class MRCReader(sidpy.Reader):
@@ -38,22 +43,27 @@ class MRCReader(sidpy.Reader):
         self.dataset = None
 
             
-    def read(self):
-        mrc_raw =  mrcfile.open(self.file_path, permissive=True)
+    def read(self, handedness='right', scan_pixel_size=None):
+        # scan pixel size needs to be in meters, if you know it
+        # handedness is either 'right' or 'left', and determines the handedness of the scan
+        # not all .mrc files have the handedness embedded, so if your file looks wrong, try changing this
+
+        # read with 
+        mrc =  mrcfile.mmap(self.file_path, permissive=True)
 
         # data
-        mrc_data = mrc_raw.data
+        mrc_data = mrc.data
 
         # metadata
-        extended_header = mrc_raw.indexed_extended_header
+        extended_header = mrc.indexed_extended_header
         metadata_labels = extended_header.dtype.names
         metadata_labels = [label for label in metadata_labels]
 
         # Reshape the data
-        shape_cantidates = ['Scan size right', 'Scan size left', 'Scan size top', 'Scan size bottom']
+        scan_shape_params = ['Scan size right', 'Scan size left', 'Scan size top', 'Scan size bottom']
 
         sizes = []
-        for label in shape_cantidates:
+        for label in scan_shape_params:
             size = np.unique(extended_header[label])
             sizes.append(size)
         sizes = np.array(sizes).flatten()
@@ -69,15 +79,23 @@ class MRCReader(sidpy.Reader):
             print(f'sorry, we do not support reading point cloud versions of this data yet')
 
 
-        # These 'pixel sizes' are usually in the order of 10^8
-        # This the ceta pixel size, not the scan step size.
-        # what are the units? 1/m?
+        # These 'pixel sizes' are usually in the order of 10^8: This the camera pixel size, not the scan step size.
         # I've talked to thermofisher and plan to update this eventually (2024-9-6)
-        pixel_sizes = []
+        camera_pixel_sizes = []
         for label in ['Pixel size X', 'Pixel size Y']:
             size = np.unique(extended_header[label])
             size *= 1e-10 # conversion from 1/m to 1/Angstrom
-            pixel_sizes.append(size)
+            camera_pixel_sizes.append(size)
+
+        # scan pixel size
+        if scan_pixel_size:
+            # if scan pixel size is given, use it
+            self.scan_pixel_size = scan_pixel_size * 1e10 # conversion from m to Angstrom
+            self.scan_size_units = 'Å'
+        else:
+            self.scan_pixel_size = 1
+            self.scan_size_units = 'pixels'
+
 
         # make metadata dictionary
         metadata = {}
@@ -93,19 +111,19 @@ class MRCReader(sidpy.Reader):
         dataset.original_metadata = self.metadata
         dataset.data_type = 'image_4d'
 
-        dataset.set_dimension(0, sidpy.Dimension(np.arange(dataset.shape[0]), 
-                                                name='x', units='Å', quantity='length',
+        dataset.set_dimension(0, sidpy.Dimension(np.arange(dataset.shape[0]) * self.scan_pixel_size, 
+                                                name='x', units=self.scan_size_units, quantity='length',
                                                 dimension_type='spatial'))
 
-        dataset.set_dimension(1, sidpy.Dimension(np.arange(dataset.shape[1]),
-                                                name='y', units='Å', quantity='length',
+        dataset.set_dimension(1, sidpy.Dimension(np.arange(dataset.shape[1]) * self.scan_pixel_size,
+                                                name='y', units=self.scan_size_units, quantity='length',
                                                 dimension_type='spatial'))
 
-        dataset.set_dimension(2, sidpy.Dimension(np.arange(dataset.shape[2]) * pixel_sizes[0],
+        dataset.set_dimension(2, sidpy.Dimension(np.arange(dataset.shape[2]) * camera_pixel_sizes[0],
                                                 name='u', units='1/Å', quantity='angle',
                                                 dimension_type='reciprocal'))
 
-        dataset.set_dimension(3, sidpy.Dimension(np.arange(dataset.shape[3]) * pixel_sizes[1],
+        dataset.set_dimension(3, sidpy.Dimension(np.arange(dataset.shape[3]) * camera_pixel_sizes[1],
                                                 name='v', units='1/Å', quantity='angle',
                                                 dimension_type='reciprocal'))
 
